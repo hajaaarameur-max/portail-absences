@@ -27,17 +27,17 @@ ChartJS.register(
   Legend
 );
 
-const chartColors = {
-  teal: '#7f1734',
-  tealLight: 'rgba(127, 23, 52, 0.14)',
-  rose: '#9f1239',
-  roseLight: 'rgba(159, 18, 57, 0.14)',
-  amber: '#8a6a3f',
-  blue: '#171417',
-  blueLight: 'rgba(23, 20, 23, 0.12)',
-  ink: '#0c0c0e',
+const colors = {
+  primary: '#7f1734',
+  primarySoft: 'rgba(127, 23, 52, 0.14)',
+  teal: '#0f766e',
+  tealSoft: 'rgba(15, 118, 110, 0.14)',
+  amber: '#b7791f',
+  amberSoft: 'rgba(183, 121, 31, 0.14)',
+  danger: '#e11d48',
+  ink: '#111113',
   muted: '#6f6870',
-  grid: '#ddd6da',
+  grid: '#e7dde2',
 };
 
 const toNumber = (value) => {
@@ -82,19 +82,16 @@ function Graphiques() {
   }, [navigate, token]);
 
   const analytics = useMemo(() => {
-    const cleanNotes = notes.map(note => ({
-      ...note,
-      valeur: toNumber(note.valeur),
-    }));
+    const cleanNotes = notes.map(note => ({ ...note, valeur: toNumber(note.valeur) }));
     const studentNames = new Map(etudiants.map(etudiant => [
       etudiant.id,
-      etudiant.user_nom || `Etudiant ${etudiant.id}`,
+      etudiant.user_nom || etudiant.nom || `Etudiant ${etudiant.id}`,
     ]));
     const moduleNames = new Map(modules.map(module => [module.id, module.nom]));
 
     const totalNotes = cleanNotes.length;
     const moyenneGenerale = totalNotes
-      ? cleanNotes.reduce((total, note) => total + note.valeur, 0) / totalNotes
+      ? cleanNotes.reduce((sum, note) => sum + note.valeur, 0) / totalNotes
       : null;
 
     const absencesJustifiees = absences.filter(absence => absence.justifiee).length;
@@ -166,7 +163,7 @@ function Graphiques() {
         label: moduleNames.get(module.module) || `Module ${module.module}`,
         moyenne: module.count ? module.total / module.count : 0,
       }))
-      .sort((a, b) => a.module - b.module);
+      .sort((a, b) => String(a.label).localeCompare(String(b.label)));
 
     const meilleurModule = [...modulePerformance].sort((a, b) => b.moyenne - a.moyenne)[0] || null;
     const moduleFragile = [...modulePerformance].sort((a, b) => a.moyenne - b.moyenne)[0] || null;
@@ -183,6 +180,10 @@ function Graphiques() {
     const penaliteRisque = Math.min(35, studentsARisque.length * 4 + absencesNonJustifiees * 2);
     const scoreGlobal = Math.max(0, Math.min(100, Math.round(scoreAcademique + scoreAssiduite - penaliteRisque)));
 
+    const actionPrioritaire = studentsARisque.length > 0
+      ? 'Planifier un suivi pour les profils a risque'
+      : 'Maintenir le suivi hebdomadaire';
+
     return {
       totalNotes,
       moyenneGenerale,
@@ -196,26 +197,60 @@ function Graphiques() {
       moduleFragile,
       distributionNotes,
       scoreGlobal,
+      actionPrioritaire,
     };
   }, [notes, absences, etudiants, modules]);
 
-  const sharedOptions = {
+  const baseOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
         labels: {
-          color: chartColors.muted,
+          color: colors.muted,
           boxWidth: 10,
           boxHeight: 10,
           font: { weight: 700 },
         },
       },
       tooltip: {
-        backgroundColor: chartColors.ink,
+        backgroundColor: colors.ink,
         padding: 12,
         titleFont: { weight: 800 },
         bodyFont: { weight: 700 },
+      },
+    },
+  };
+
+  const axisOptions = {
+    ...baseOptions,
+    plugins: {
+      ...baseOptions.plugins,
+      legend: { display: false },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        max: 20,
+        grid: { color: colors.grid },
+        ticks: { color: colors.muted, font: { weight: 700 } },
+      },
+      x: {
+        grid: { display: false },
+        ticks: { color: colors.muted, font: { weight: 700 } },
+      },
+    },
+  };
+
+  const riskOptions = {
+    ...axisOptions,
+    scales: {
+      ...axisOptions.scales,
+      y: {
+        beginAtZero: true,
+        max: 100,
+        grid: { color: colors.grid },
+        ticks: { color: colors.muted, font: { weight: 700 } },
       },
     },
   };
@@ -226,26 +261,13 @@ function Graphiques() {
       label: 'Moyenne par module',
       data: analytics.modulePerformance.map(module => Number(module.moyenne.toFixed(2))),
       fill: true,
-      borderColor: chartColors.blue,
-      backgroundColor: chartColors.blueLight,
-      pointBackgroundColor: chartColors.blue,
+      borderColor: colors.primary,
+      backgroundColor: colors.primarySoft,
+      pointBackgroundColor: colors.primary,
       pointBorderColor: '#ffffff',
       pointBorderWidth: 3,
       pointRadius: 5,
-      tension: 0.38,
-    }],
-  };
-
-  const riskBarData = {
-    labels: analytics.studentProfiles.slice(0, 8).map(student => student.name),
-    datasets: [{
-      label: 'Score de risque',
-      data: analytics.studentProfiles.slice(0, 8).map(student => student.riskScore),
-      backgroundColor: analytics.studentProfiles.slice(0, 8).map(student =>
-        student.riskScore >= 60 ? chartColors.rose : student.riskScore >= 35 ? chartColors.amber : chartColors.teal
-      ),
-      borderRadius: 8,
-      barThickness: 28,
+      tension: 0.35,
     }],
   };
 
@@ -254,8 +276,9 @@ function Graphiques() {
     datasets: [{
       label: 'Nombre de notes',
       data: analytics.distributionNotes,
-      backgroundColor: [chartColors.teal, chartColors.blue, chartColors.amber, chartColors.rose],
+      backgroundColor: [colors.teal, colors.primary, colors.amber, colors.danger],
       borderRadius: 8,
+      barThickness: 34,
     }],
   };
 
@@ -263,79 +286,37 @@ function Graphiques() {
     labels: ['Justifiees', 'Non justifiees'],
     datasets: [{
       data: [analytics.absencesJustifiees, analytics.absencesNonJustifiees],
-      backgroundColor: [chartColors.teal, chartColors.rose],
+      backgroundColor: [colors.teal, colors.danger],
       borderColor: '#ffffff',
       borderWidth: 5,
       hoverOffset: 8,
     }],
   };
 
-  const axisOptions = {
-    ...sharedOptions,
-    scales: {
-      y: {
-        beginAtZero: true,
-        max: 20,
-        grid: { color: chartColors.grid },
-        ticks: { color: chartColors.muted, font: { weight: 700 } },
-      },
-      x: {
-        grid: { display: false },
-        ticks: { color: chartColors.muted, font: { weight: 700 } },
-      },
-    },
-  };
-
-  const riskOptions = {
-    ...sharedOptions,
-    plugins: {
-      ...sharedOptions.plugins,
-      legend: { display: false },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        max: 100,
-        grid: { color: chartColors.grid },
-        ticks: { color: chartColors.muted, font: { weight: 700 } },
-      },
-      x: {
-        grid: { display: false },
-        ticks: { color: chartColors.muted, font: { weight: 700 } },
-      },
-    },
-  };
-
-  const distributionOptions = {
-    ...sharedOptions,
-    plugins: {
-      ...sharedOptions.plugins,
-      legend: { display: false },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        grid: { color: chartColors.grid },
-        ticks: { color: chartColors.muted, precision: 0, font: { weight: 700 } },
-      },
-      x: {
-        grid: { display: false },
-        ticks: { color: chartColors.muted, font: { weight: 700 } },
-      },
-    },
+  const riskBarData = {
+    labels: analytics.studentProfiles.slice(0, 6).map(student => student.name),
+    datasets: [{
+      label: 'Score de risque',
+      data: analytics.studentProfiles.slice(0, 6).map(student => student.riskScore),
+      backgroundColor: analytics.studentProfiles.slice(0, 6).map(student =>
+        student.riskScore >= 60 ? colors.danger : student.riskScore >= 35 ? colors.amber : colors.teal
+      ),
+      borderRadius: 8,
+      barThickness: 26,
+    }],
   };
 
   const hasNotes = analytics.totalNotes > 0;
   const hasAbsences = absences.length > 0;
 
   return (
-    <div className="app-shell analytics-shell">
+    <div className="app-shell jury-shell">
       <nav className="app-nav">
         <div className="brand">
           <div className="brand-mark">PA</div>
           <div className="brand-text">
             <span className="brand-title">Portail Absences</span>
-            <span className="brand-subtitle">Graphiques intelligents</span>
+            <span className="brand-subtitle">Tableau de bord analytique</span>
           </div>
         </div>
         <div className="nav-actions">
@@ -344,67 +325,62 @@ function Graphiques() {
         </div>
       </nav>
 
-      <main className="page page-wide analytics-page">
-        <section className="analytics-hero">
-          <div className="analytics-hero-copy">
-            <p className="kicker">Centre de pilotage</p>
-            <h1>Graphiques intelligents</h1>
+      <main className="jury-page">
+        <section className="jury-header">
+          <div>
+            <span className="jury-eyebrow">Presentation PFA</span>
+            <h1>Analyse academique et assiduite</h1>
             <p>
-              Une lecture visuelle des performances, des absences et des profils a surveiller
-              pour presenter le projet comme un vrai outil d'aide a la decision.
+              Une structure claire pour montrer rapidement les indicateurs,
+              les tendances et les decisions possibles devant le jury.
             </p>
           </div>
-          <div className="hero-score-card">
+          <aside className="jury-score">
             <span>Indice global</span>
             <strong>{analytics.scoreGlobal}%</strong>
-            <div className="hero-score-meter" style={{ '--score': `${analytics.scoreGlobal}%` }}>
-              <span />
+            <div className="jury-score-track">
+              <i style={{ width: `${analytics.scoreGlobal}%` }} />
             </div>
-            <p>{analytics.studentsARisque.length} etudiant(s) demandent une attention prioritaire.</p>
-          </div>
+          </aside>
         </section>
 
         {error && <div className="alert alert-danger">{error}</div>}
 
-        <section className="analytics-kpis" aria-label="Indicateurs importants">
-          <article className="analytics-kpi-card">
-            <span className="kpi-code">MOY</span>
+        <section className="jury-kpis" aria-label="Indicateurs principaux">
+          <article>
+            <span>Moyenne generale</span>
             <strong>{formatAverage(analytics.moyenneGenerale)}/20</strong>
-            <p>Moyenne generale</p>
           </article>
-          <article className="analytics-kpi-card danger">
-            <span className="kpi-code">RIS</span>
+          <article>
+            <span>Notes analysees</span>
+            <strong>{analytics.totalNotes}</strong>
+          </article>
+          <article>
+            <span>Profils a risque</span>
             <strong>{analytics.studentsARisque.length}</strong>
-            <p>Etudiants a surveiller</p>
           </article>
-          <article className="analytics-kpi-card warning">
-            <span className="kpi-code">ABS</span>
+          <article>
+            <span>Absences non justifiees</span>
             <strong>{analytics.absencesNonJustifiees}</strong>
-            <p>Absences non justifiees</p>
-          </article>
-          <article className="analytics-kpi-card success">
-            <span className="kpi-code">ASS</span>
-            <strong>{analytics.tauxJustification}%</strong>
-            <p>Taux de justification</p>
           </article>
         </section>
 
         {loading ? (
-          <div className="panel">
+          <section className="jury-card">
             <p className="empty-state">Chargement des graphiques...</p>
-          </div>
+          </section>
         ) : (
           <>
-            <section className="analytics-showcase">
-              <article className="analytics-card analytics-card-xl">
-                <div className="analytics-card-header">
+            <section className="jury-layout">
+              <article className="jury-card jury-main-chart">
+                <div className="jury-card-header">
                   <div>
-                    <span className="eyebrow">Performance</span>
-                    <h2>Evolution des moyennes par module</h2>
+                    <span className="jury-eyebrow">Performance</span>
+                    <h2>Moyenne par module</h2>
                   </div>
                   <span className="badge badge-primary">{analytics.modulePerformance.length} modules</span>
                 </div>
-                <div className="chart-frame chart-frame-lg">
+                <div className="jury-chart-large">
                   {hasNotes ? (
                     <Line data={moduleLineData} options={axisOptions} />
                   ) : (
@@ -413,36 +389,60 @@ function Graphiques() {
                 </div>
               </article>
 
-              <article className="analytics-card">
-                <div className="analytics-card-header">
-                  <div>
-                    <span className="eyebrow">Assiduite</span>
-                    <h2>Qualite des absences</h2>
+              <aside className="jury-side">
+                <article className="jury-card">
+                  <div className="jury-card-header">
+                    <div>
+                      <span className="jury-eyebrow">Assiduite</span>
+                      <h2>Absences</h2>
+                    </div>
                   </div>
-                </div>
-                <div className="donut-wrap">
-                  {hasAbsences ? (
-                    <Doughnut data={absencesData} options={{ ...sharedOptions, cutout: '68%' }} />
-                  ) : (
-                    <p className="empty-state">Aucune absence disponible</p>
-                  )}
-                </div>
-                <div className="mini-legend">
-                  <span><i className="legend-dot teal" />Justifiees: {analytics.absencesJustifiees}</span>
-                  <span><i className="legend-dot rose" />Non justifiees: {analytics.absencesNonJustifiees}</span>
-                </div>
-              </article>
+                  <div className="jury-donut">
+                    {hasAbsences ? (
+                      <Doughnut data={absencesData} options={{ ...baseOptions, cutout: '70%' }} />
+                    ) : (
+                      <p className="empty-state">Aucune absence disponible</p>
+                    )}
+                  </div>
+                  <div className="jury-legend">
+                    <span><i className="ok" />Justifiees: {analytics.absencesJustifiees}</span>
+                    <span><i className="danger" />Non justifiees: {analytics.absencesNonJustifiees}</span>
+                  </div>
+                </article>
+
+                <article className="jury-card jury-decision">
+                  <span className="jury-eyebrow">Decision</span>
+                  <h2>Action prioritaire</h2>
+                  <p>{analytics.actionPrioritaire}</p>
+                </article>
+              </aside>
             </section>
 
-            <section className="analytics-grid">
-              <article className="analytics-card">
-                <div className="analytics-card-header">
+            <section className="jury-bottom-grid">
+              <article className="jury-card">
+                <div className="jury-card-header">
                   <div>
-                    <span className="eyebrow">Priorite</span>
-                    <h2>Score de risque par etudiant</h2>
+                    <span className="jury-eyebrow">Niveaux</span>
+                    <h2>Distribution des notes</h2>
                   </div>
                 </div>
-                <div className="chart-frame">
+                <div className="jury-chart">
+                  {hasNotes ? (
+                    <Bar data={distributionData} options={axisOptions} />
+                  ) : (
+                    <p className="empty-state">Aucune note disponible</p>
+                  )}
+                </div>
+              </article>
+
+              <article className="jury-card">
+                <div className="jury-card-header">
+                  <div>
+                    <span className="jury-eyebrow">Suivi cible</span>
+                    <h2>Top risques etudiants</h2>
+                  </div>
+                </div>
+                <div className="jury-chart">
                   {analytics.studentProfiles.length > 0 ? (
                     <Bar data={riskBarData} options={riskOptions} />
                   ) : (
@@ -450,64 +450,23 @@ function Graphiques() {
                   )}
                 </div>
               </article>
-
-              <article className="analytics-card">
-                <div className="analytics-card-header">
-                  <div>
-                    <span className="eyebrow">Niveaux</span>
-                    <h2>Distribution des notes</h2>
-                  </div>
-                </div>
-                <div className="chart-frame">
-                  {hasNotes ? (
-                    <Bar data={distributionData} options={distributionOptions} />
-                  ) : (
-                    <p className="empty-state">Aucune note disponible</p>
-                  )}
-                </div>
-              </article>
             </section>
 
-            <section className="insight-grid">
-              <article className="insight-panel">
-                <span className="eyebrow">Lecture jury</span>
-                <h2>Points forts a annoncer</h2>
-                <div className="insight-list">
-                  <div>
-                    <span>Meilleur module</span>
-                    <strong>{analytics.meilleurModule ? `${analytics.meilleurModule.label} - ${analytics.meilleurModule.moyenne.toFixed(2)}/20` : 'N/A'}</strong>
-                  </div>
-                  <div>
-                    <span>Module a renforcer</span>
-                    <strong>{analytics.moduleFragile ? `${analytics.moduleFragile.label} - ${analytics.moduleFragile.moyenne.toFixed(2)}/20` : 'N/A'}</strong>
-                  </div>
-                  <div>
-                    <span>Signal assiduite</span>
-                    <strong>{analytics.tauxJustification}% des absences sont justifiees</strong>
-                  </div>
-                </div>
+            <section className="jury-insights">
+              <article>
+                <span>Meilleur module</span>
+                <strong>{analytics.meilleurModule ? analytics.meilleurModule.label : 'N/A'}</strong>
+                <p>{analytics.meilleurModule ? `${analytics.meilleurModule.moyenne.toFixed(2)}/20` : 'Aucune donnee'}</p>
               </article>
-
-              <article className="insight-panel">
-                <span className="eyebrow">Suivi cible</span>
-                <h2>Top profils a surveiller</h2>
-                <div className="risk-list">
-                  {analytics.studentProfiles.length === 0 ? (
-                    <p className="empty-state">Aucun etudiant disponible</p>
-                  ) : analytics.studentProfiles.slice(0, 4).map(student => (
-                    <div className="risk-row" key={student.id}>
-                      <span className={`risk-dot ${student.riskScore >= 60 ? 'danger' : student.riskScore >= 35 ? 'warning' : 'success'}`} />
-                      <div>
-                        <strong>{student.name}</strong>
-                        <p>
-                          Moyenne {formatAverage(student.moyenne)}/20 ·
-                          {student.absencesNonJustifiees} absence(s) non justifiee(s)
-                        </p>
-                      </div>
-                      <span className="risk-score">{student.riskScore}%</span>
-                    </div>
-                  ))}
-                </div>
+              <article>
+                <span>Module a renforcer</span>
+                <strong>{analytics.moduleFragile ? analytics.moduleFragile.label : 'N/A'}</strong>
+                <p>{analytics.moduleFragile ? `${analytics.moduleFragile.moyenne.toFixed(2)}/20` : 'Aucune donnee'}</p>
+              </article>
+              <article>
+                <span>Taux de justification</span>
+                <strong>{analytics.tauxJustification}%</strong>
+                <p>Qualite du suivi des absences</p>
               </article>
             </section>
           </>

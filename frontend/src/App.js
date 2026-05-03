@@ -9,6 +9,7 @@ import Graphiques from './pages/Graphiques';
 import Profil from './pages/Profil';
 import ExportPDF from './pages/ExportPDF';
 import Intelligence from './pages/Intelligence';
+import DossierEtudiant from './pages/DossierEtudiant';
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
         <Route path="/profil" element={<Profil />} />
         <Route path="/export" element={<ExportPDF />} />
         <Route path="/intelligence" element={<Intelligence />} />
+        <Route path="/dossier-etudiant" element={<DossierEtudiant />} />
       </Routes>
     </BrowserRouter>
   );
